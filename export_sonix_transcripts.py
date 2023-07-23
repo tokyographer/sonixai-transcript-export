@@ -2,6 +2,7 @@ import os
 import requests
 from tqdm import tqdm
 import time
+import concurrent.futures
 from sonix_credentials import SONIX_API_KEY
 
 SONIX_API_BASE_URL = "https://api.sonix.ai"
@@ -25,7 +26,10 @@ def get_transcript(id):
         response = requests.get(url, headers=headers)
         response_json = response.json()
         if response.status_code == 200:
-            return response_json.get("transcript")
+            if "transcript" in response_json:
+                return id, response_json["transcript"]
+            else:
+                print(f"Error for ID {id}: No transcript found in the response.")
         else:
             print(f"Error for ID {id}: Status Code {response.status_code}")
             print(response_json)  # Print the full response to check for details
@@ -42,12 +46,17 @@ progress_bar = tqdm(total=total_ids, unit="id", desc="Transcribing")
 # Timer start
 start_time = time.time()
 
-# Iterate through each ID and get the transcript
-for id in ids:
-    transcript = get_transcript(id)
+# Concurrently fetch transcripts using ThreadPoolExecutor
+with concurrent.futures.ThreadPoolExecutor() as executor:
+    # Use a dictionary to keep track of transcript results
+    transcript_results = {id: transcript for id, transcript in executor.map(get_transcript, ids)}
+
+# Iterate through the results and save transcripts to files
+for id, transcript in transcript_results.items():
     if transcript:
         with open(f"{OUTPUT_DIRECTORY}/{id}_transcript.txt", "w") as f:
             f.write(transcript)
+
     progress_bar.update(1)
 
 # Timer end
