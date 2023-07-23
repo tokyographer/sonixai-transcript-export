@@ -1,43 +1,50 @@
 import os
 import requests
-import json
-import time
 from tqdm import tqdm
-from sonix_credentials import SONIX_API_KEY, SONIX_API_URL
+from sonix_credentials import SONIX_API_KEY
 
-def export_transcripts():
-    # Create a folder named "transcripts" if it doesn't exist
-    if not os.path.exists("transcripts"):
-        os.makedirs("transcripts")
+# Base URL for Sonix API
+SONIX_API_BASE_URL = "https://api.sonix.ai/v1"
 
-    # Get the list of all transcripts
-    headers = {"Authorization": f"Bearer {SONIX_API_KEY}"}
-    response = requests.get(f"{SONIX_API_URL}/v1/files", headers=headers)
-    transcripts_data = json.loads(response.text)
+# Function to get all transcripts from Sonix.ai
+def get_transcripts(api_key):
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+    }
 
-    # Extract transcript IDs and filenames
-    transcript_ids = [item["id"] for item in transcripts_data["data"]]
+    # Fetch all transcripts using Sonix.ai API
+    response = requests.get(f"{SONIX_API_BASE_URL}/transcripts", headers=headers)
+    response.raise_for_status()
 
-    # Export transcripts one by one and save them as text files
-    for transcript_id in tqdm(transcript_ids, desc="Exporting Transcripts"):
-        response = requests.get(f"{SONIX_API_URL}/v1/files/{transcript_id}/content", headers=headers)
+    return response.json()["results"]
 
-        # Check if the API request was successful
-         if response.status_code == 200:
-            transcript_data = json.loads(response.text)
-            filename = f"transcripts/{transcript_data['data']['name']}.txt"
-            with open(filename, "w", encoding="utf-8") as file:
-                    file.write(transcript_data["data"]["content"])
-        else:
-            print(f"Error exporting transcript {transcript_id}. Status Code: {response.status_code}")
-            print("Response content:", response.text)
+# Function to export transcript text to a file
+def export_transcript_to_file(transcript):
+    filename = os.path.join("transcripts", f"{transcript['name']}.txt")
 
+    # Write the transcript content to a text file
+    with open(filename, "w", encoding="utf-8") as file:
+        file.write(transcript["content"])
+
+# Main function
+def main():
+    try:
+        # Create the 'transcripts' directory if it doesn't exist
+        os.makedirs("transcripts", exist_ok=True)
+
+        # Get the list of transcripts
+        transcripts = get_transcripts(SONIX_API_KEY)
+
+        # Display progress bar and export transcripts
+        print("Exporting transcripts:")
+        for transcript in tqdm(transcripts, unit="transcript"):
+            export_transcript_to_file(transcript)
+
+        print("Transcripts exported successfully!")
+    except requests.exceptions.HTTPError as e:
+        print(f"Error: {e}")
+    except Exception as e:
+        print(f"Unexpected error: {e}")
 
 if __name__ == "__main__":
-    start_time = time.time()
-
-    export_transcripts()
-
-    end_time = time.time()
-    duration = end_time - start_time
-    print(f"Transcripts exported successfully! Total duration: {duration:.2f} seconds.")
+    main()
