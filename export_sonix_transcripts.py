@@ -1,45 +1,42 @@
 import os
 import requests
-import json
 from tqdm import tqdm
-from sonix_credentials import API_KEY, BASE_URL
+import time
 
+# Function to fetch transcript and save to a file
+def fetch_and_save_transcript(id):
+    url = f"https://api.sonix.ai/v1/media/{id}/transcript.txt"
+    response = requests.get(url)
 
-def fetch_transcript(media_id):
-    headers = {
-        "Authorization": f"Bearer {API_KEY}"
-    }
-    url = f"{BASE_URL}/v1/media/{media_id}/transcript"
-
-    response = requests.get(url, headers=headers)
     if response.status_code == 200:
-        return response.json()
-    else:
-        print(f"Failed to fetch transcript for Media ID: {media_id}")
-        return None
+        with open(f"transcript_{id}.txt", "w", encoding="utf-8") as file:
+            file.write(response.text)
 
-
-def save_transcript(media_id, transcript):
-    file_path = os.path.join("transcripts", f"{media_id}.txt")
-    with open(file_path, "w", encoding="utf-8") as file:
-        file.write(transcript)
-
+# Read the list of ids from the sonixmedia.txt file
+def read_ids_from_file(file_path):
+    with open(file_path, "r") as file:
+        ids = [line.strip() for line in file]
+    return ids
 
 def main():
-    os.makedirs("transcripts", exist_ok=True)
+    file_path = "sonixmedia.txt"
+    ids = read_ids_from_file(file_path)
 
-    # Dummy media IDs, replace this with your actual media IDs from sonix.ai account
-    media_ids = ["media_id_1", "media_id_2", "media_id_3"]
+    total_ids = len(ids)
+    print(f"Total number of ids: {total_ids}\n")
 
-    print("Fetching and saving transcripts...")
-    for media_id in tqdm(media_ids):
-        transcript_data = fetch_transcript(media_id)
-        if transcript_data:
-            transcript_text = transcript_data.get("text", "")
-            save_transcript(media_id, transcript_text)
+    start_time = time.time()
 
-    print("Transcripts have been exported successfully!")
+    # Using tqdm to create a progress bar
+    with tqdm(total=total_ids, desc="Fetching Transcripts", unit="id") as pbar:
+        for id in ids:
+            fetch_and_save_transcript(id)
+            pbar.update(1)
 
+    end_time = time.time()
+    elapsed_time = end_time - start_time
+
+    print(f"\nTranscripts fetched and saved in {elapsed_time:.2f} seconds.")
 
 if __name__ == "__main__":
     main()
