@@ -2,7 +2,6 @@ import os
 import requests
 from tqdm import tqdm
 import time
-
 from sonix_credentials import SONIX_API_KEY
 
 SONIX_API_BASE_URL = "https://api.sonix.ai"
@@ -19,19 +18,22 @@ with open(INPUT_FILE, "r") as f:
 def get_transcript(id):
     url = f"{SONIX_API_BASE_URL}/v1/media/{id}/transcript"
     headers = {
-        "Authorization": "SONIX_API_KEY",  # Replace with your Sonix API key
+        "Authorization": f"Bearer {SONIX_API_KEY}",
     }
 
     try:
         response = requests.get(url, headers=headers)
         response_json = response.json()
         if response.status_code == 200:
-            return response_json["transcript"]
+            return response_json.get("transcript")
         else:
             print(f"Error for ID {id}: Status Code {response.status_code}")
             print(response_json)  # Print the full response to check for details
     except requests.exceptions.RequestException as e:
         print(f"Error for ID {id}: {e}")
+    except ValueError as ve:
+        print(f"Error for ID {id}: Invalid JSON response")
+        print(f"Response Content: {response.text}")
 
 # Progress bar setup
 total_ids = len(ids)
