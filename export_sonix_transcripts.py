@@ -3,40 +3,57 @@ import requests
 from tqdm import tqdm
 import time
 
-# Function to fetch transcript and save to a file
-def fetch_and_save_transcript(id):
-    url = f"https://api.sonix.ai/v1/media/{id}/transcript.txt"
-    response = requests.get(url)
+from sonix_credentials import SONIX_API_KEY
 
-    if response.status_code == 200:
-        with open(f"transcript_{id}.txt", "w", encoding="utf-8") as file:
-            file.write(response.text)
+SONIX_API_BASE_URL = "https://api.sonix.ai"
+OUTPUT_DIRECTORY = "transcripts"
+INPUT_FILE = "sonixids.txt"
 
-# Read the list of ids from the sonixmedia.txt file
-def read_ids_from_file(file_path):
-    with open(file_path, "r") as file:
-        ids = [line.strip() for line in file]
-    return ids
+# Create the output directory if it doesn't exist
+os.makedirs(OUTPUT_DIRECTORY, exist_ok=True)
 
-def main():
-    file_path = "sonixmedia.txt"
-    ids = read_ids_from_file(file_path)
+# Read the list of ids from the input file
+with open(INPUT_FILE, "r") as f:
+    ids = f.read().splitlines()
 
-    total_ids = len(ids)
-    print(f"Total number of ids: {total_ids}\n")
+def get_transcript(id):
+    url = f"{SONIX_API_BASE_URL}/v1/media/{id}/transcript"
+    headers = {
+        "Authorization": "SONIX_API_KEY",  # Replace with your Sonix API key
+    }
 
-    start_time = time.time()
+    try:
+        response = requests.get(url, headers=headers)
+        response_json = response.json()
+        if response.status_code == 200:
+            return response_json["transcript"]
+        else:
+            print(f"Error for ID {id}: Status Code {response.status_code}")
+            print(response_json)  # Print the full response to check for details
+    except requests.exceptions.RequestException as e:
+        print(f"Error for ID {id}: {e}")
 
-    # Using tqdm to create a progress bar
-    with tqdm(total=total_ids, desc="Fetching Transcripts", unit="id") as pbar:
-        for id in ids:
-            fetch_and_save_transcript(id)
-            pbar.update(1)
+# Progress bar setup
+total_ids = len(ids)
+progress_bar = tqdm(total=total_ids, unit="id", desc="Transcribing")
 
-    end_time = time.time()
-    elapsed_time = end_time - start_time
+# Timer start
+start_time = time.time()
 
-    print(f"\nTranscripts fetched and saved in {elapsed_time:.2f} seconds.")
+# Iterate through each ID and get the transcript
+for id in ids:
+    transcript = get_transcript(id)
+    if transcript:
+        with open(f"{OUTPUT_DIRECTORY}/{id}_transcript.txt", "w") as f:
+            f.write(transcript)
+    progress_bar.update(1)
 
-if __name__ == "__main__":
-    main()
+# Timer end
+end_time = time.time()
+execution_time = end_time - start_time
+
+# Close the progress bar
+progress_bar.close()
+
+print(f"\nTranscription completed for {total_ids} IDs.")
+print(f"Total execution time: {execution_time:.2f} seconds.")
