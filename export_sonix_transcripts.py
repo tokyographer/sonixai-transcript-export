@@ -1,50 +1,45 @@
 import os
 import requests
+import json
 from tqdm import tqdm
-from sonix_credentials import SONIX_API_KEY
+from sonix_credentials import API_KEY, BASE_URL
 
-# Base URL for Sonix API
-SONIX_API_BASE_URL = "https://api.sonix.ai/v1"
 
-# Function to get all transcripts from Sonix.ai
-def get_transcripts(api_key):
+def fetch_transcript(media_id):
     headers = {
-        "Authorization": f"Bearer {api_key}",
+        "Authorization": f"Bearer {API_KEY}"
     }
+    url = f"{BASE_URL}/v1/media/{media_id}/transcript"
 
-    # Fetch all transcripts using Sonix.ai API
-    response = requests.get(f"{SONIX_API_BASE_URL}/transcripts", headers=headers)
-    response.raise_for_status()
+    response = requests.get(url, headers=headers)
+    if response.status_code == 200:
+        return response.json()
+    else:
+        print(f"Failed to fetch transcript for Media ID: {media_id}")
+        return None
 
-    return response.json()["results"]
 
-# Function to export transcript text to a file
-def export_transcript_to_file(transcript):
-    filename = os.path.join("transcripts", f"{transcript['name']}.txt")
+def save_transcript(media_id, transcript):
+    file_path = os.path.join("transcripts", f"{media_id}.txt")
+    with open(file_path, "w", encoding="utf-8") as file:
+        file.write(transcript)
 
-    # Write the transcript content to a text file
-    with open(filename, "w", encoding="utf-8") as file:
-        file.write(transcript["content"])
 
-# Main function
 def main():
-    try:
-        # Create the 'transcripts' directory if it doesn't exist
-        os.makedirs("transcripts", exist_ok=True)
+    os.makedirs("transcripts", exist_ok=True)
 
-        # Get the list of transcripts
-        transcripts = get_transcripts(SONIX_API_KEY)
+    # Dummy media IDs, replace this with your actual media IDs from sonix.ai account
+    media_ids = ["media_id_1", "media_id_2", "media_id_3"]
 
-        # Display progress bar and export transcripts
-        print("Exporting transcripts:")
-        for transcript in tqdm(transcripts, unit="transcript"):
-            export_transcript_to_file(transcript)
+    print("Fetching and saving transcripts...")
+    for media_id in tqdm(media_ids):
+        transcript_data = fetch_transcript(media_id)
+        if transcript_data:
+            transcript_text = transcript_data.get("text", "")
+            save_transcript(media_id, transcript_text)
 
-        print("Transcripts exported successfully!")
-    except requests.exceptions.HTTPError as e:
-        print(f"Error: {e}")
-    except Exception as e:
-        print(f"Unexpected error: {e}")
+    print("Transcripts have been exported successfully!")
+
 
 if __name__ == "__main__":
     main()
