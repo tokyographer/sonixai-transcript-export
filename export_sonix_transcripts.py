@@ -1,58 +1,36 @@
-# main.py
-
-import time
+import os
 import requests
+import json
+import time
 from tqdm import tqdm
-from sonix_credentials import SONIX_API_KEY
+from sonix_credentials import SONIX_API_KEY, SONIX_API_URL
 
-def get_transcript_ids():
-    api_url = "https://api.sonix.ai/v1/transcripts"
+def export_transcripts():
+    # Create a folder named "transcripts" if it doesn't exist
+    if not os.path.exists("transcripts"):
+        os.makedirs("transcripts")
 
-    headers = {
-        "Authorization": f"Bearer {SONIX_API_KEY}",
-    }
+    # Get the list of all transcripts
+    headers = {"Authorization": f"Bearer {SONIX_API_KEY}"}
+    response = requests.get(f"{SONIX_API_URL}/v1/files", headers=headers)
+    transcripts_data = json.loads(response.text)
 
-    response = requests.get(api_url, headers=headers)
+    # Extract transcript IDs and filenames
+    transcript_ids = [item["id"] for item in transcripts_data["data"]]
 
-    if response.status_code == 200:
-        return response.json()
-    else:
-        print("Failed to fetch transcripts.")
-        print(response.text)
-        return []
-
-def get_transcript_text(transcript_id):
-    api_url = f"https://api.sonix.ai/v1/transcripts/{transcript_id}/plain"
-
-    headers = {
-        "Authorization": f"Bearer {SONIX_API_KEY}",
-    }
-
-    response = requests.get(api_url, headers=headers)
-
-    if response.status_code == 200:
-        return response.text
-    else:
-        print(f"Failed to fetch transcript with ID {transcript_id}.")
-        print(response.text)
-        return None
+    # Export transcripts one by one and save them as text files
+    for transcript_id in tqdm(transcript_ids, desc="Exporting Transcripts"):
+        response = requests.get(f"{SONIX_API_URL}/v1/files/{transcript_id}/content", headers=headers)
+        transcript_data = json.loads(response.text)
+        filename = f"transcripts/{transcript_data['data']['name']}.txt"
+        with open(filename, "w", encoding="utf-8") as file:
+            file.write(transcript_data["data"]["content"])
 
 if __name__ == "__main__":
     start_time = time.time()
-    transcripts = get_transcript_ids()
 
-    if transcripts:
-        num_transcripts = len(transcripts)
-        print(f"Fetching {num_transcripts} transcripts...")
-        for transcript in tqdm(transcripts):
-            transcript_id = transcript['id']
-            transcript_text = get_transcript_text(transcript_id)
-
-            if transcript_text:
-                print(f"Transcript ID: {transcript_id}")
-                print(f"Transcript Text: {transcript_text}")
-                print("----")
+    export_transcripts()
 
     end_time = time.time()
     duration = end_time - start_time
-    print(f"Process completed in {duration:.2f} seconds.")
+    print(f"Transcripts exported successfully! Total duration: {duration:.2f} seconds.")
